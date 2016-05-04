@@ -1,0 +1,98 @@
+begin;
+
+CREATE OR REPLACE FUNCTION trj_in(cstring)
+RETURNS Trajectory
+AS 'MODULE_PATHNAME','trj_in'
+LANGUAGE C
+IMMUTABLE STRICT;
+
+
+CREATE OR REPLACE FUNCTION trj_out(trajectory)
+RETURNS cstring
+AS 'MODULE_PATHNAME','trj_out'
+LANGUAGE C
+IMMUTABLE STRICT;
+
+
+CREATE TYPE trajectory (
+   internallength = variable,
+   input = trj_in,
+   output = trj_out,
+   storage = main
+);
+
+CREATE OR REPLACE FUNCTION trj_trajectory_makeEmpty( integer,  integer,  integer,  integer,  integer,  integer)
+RETURNS Trajectory
+AS 'MODULE_PATHNAME','trj_trajectory_makeEmpty'
+LANGUAGE C
+IMMUTABLE STRICT;
+
+CREATE OR REPLACE FUNCTION trj_get_srid(trajectory)
+RETURNS integer
+AS 'MODULE_PATHNAME','trj_get_srid'
+LANGUAGE C
+IMMUTABLE STRICT;
+
+CREATE OR REPLACE FUNCTION trj_get_nvolume(trajectory)
+RETURNS integer
+AS 'MODULE_PATHNAME','trj_get_nvolume'
+LANGUAGE C
+IMMUTABLE STRICT;
+
+CREATE OR REPLACE FUNCTION trj_get_nlocation(trajectory)
+RETURNS integer
+AS 'MODULE_PATHNAME','trj_get_nlocation'
+LANGUAGE C
+IMMUTABLE STRICT;
+
+CREATE OR REPLACE FUNCTION trj_get_extent(trajectory)
+RETURNS BOX3D
+AS 'MODULE_PATHNAME','trj_get_extent'
+LANGUAGE C
+IMMUTABLE STRICT;
+
+CREATE OR REPLACE FUNCTION trj_get_starttime(trajectory)
+RETURNS cstring
+AS 'MODULE_PATHNAME','trj_get_starttime'
+LANGUAGE C
+IMMUTABLE STRICT;
+
+CREATE OR REPLACE FUNCTION trj_get_endtime(trajectory)
+RETURNS cstring
+AS 'MODULE_PATHNAME','trj_get_endtime'
+LANGUAGE C
+IMMUTABLE STRICT;
+
+CREATE OR REPLACE FUNCTION trj_get_hasaccuracy(trajectory)
+RETURNS integer
+AS 'MODULE_PATHNAME','trj_get_hasaccuracy'
+LANGUAGE C
+IMMUTABLE STRICT;
+
+CREATE OR REPLACE FUNCTION trj_get_hasaltitude(trajectory)
+RETURNS integer
+AS 'MODULE_PATHNAME','trj_get_hasaltitude'
+LANGUAGE C
+IMMUTABLE STRICT;
+
+CREATE OR REPLACE FUNCTION trj_get_hasbearing(trajectory)
+RETURNS integer
+AS 'MODULE_PATHNAME','trj_get_hasbearing'
+LANGUAGE C
+IMMUTABLE STRICT;
+
+
+CREATE OR REPLACE FUNCTION trj_get_location_n(trajectory)
+RETURNS float
+AS 'MODULE_PATHNAME','trj_get_location_n'
+LANGUAGE C
+IMMUTABLE STRICT;
+
+CREATE OR REPLACE FUNCTION trj_get_hasspeed(trajectory)
+RETURNS integer
+AS 'MODULE_PATHNAME','trj_get_hasspeed'
+LANGUAGE C
+IMMUTABLE STRICT;
+
+
+end;

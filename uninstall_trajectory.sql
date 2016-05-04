@@ -1,0 +1,1 @@
+drop type trajectory CASCADE;

@@ -1,0 +1,343 @@
+
+
+
+
+/**
+* Global functions for memory/logging handlers.
+*/
+typedef void* (*trj_allocator)(size_t size);
+typedef void* (*trj_reallocator)(void *mem, size_t size);
+typedef void  (*trj_deallocator)(void *mem);
+typedef void  (*trj_message_handler)(const char* string, va_list ap);
+
+
+/* Functions definitions */
+void * init_trj_allocator(size_t size);
+void * init_trj_reallocator(void * mem, size_t size);
+void init_trj_deallocator(void * mem);
+void init_trj_errorreporter(const char * fmt, va_list ap);
+void init_trj_warnreporter(const char * fmt, va_list ap);
+void init_trj_inforeporter(const char * fmt, va_list ap);
+
+extern void trj_init_allocators(void);
+
+
+extern void trj_install_default_allocators(void);
+
+
+/**
+ * Wrappers used for managing memory. They simply call the functions defined by
+ * the caller
+ **/
+extern void* trjalloc(size_t size);
+extern void* trjrealloc(void* mem, size_t size);
+extern void trjdealloc(void* mem);
+
+void trjerror(const char *fmt, ...);
+void trjinfo(const char *fmt, ...);
+void trjwarn(const char *fmt, ...);
+
+/**
+* The default memory/logging handlers installed by lwgeom_install_default_allocators()
+*/
+void * default_trj_allocator(size_t size);
+void * default_trj_reallocator(void * mem, size_t size);
+void default_trj_deallocator(void * mem);
+void default_trj_error_handler(const char * fmt, va_list ap);
+void default_trj_warning_handler(const char * fmt, va_list ap);
+void default_trj_info_handler(const char * fmt, va_list ap);
+
+
+
+/* Debugging macros */
+#if POSTGIS_DEBUG_LEVEL > 0
+
+/* Display a simple message at NOTICE level */
+#define TRJ_DEBUG(level, msg) \
+    do { \
+        if (POSTGIS_DEBUG_LEVEL >= level) \
+            trjinfo("[%s:%s:%d] " msg, __FILE__, __func__, __LINE__); \
+    } while (0);
+
+/* Display a formatted message at NOTICE level (like printf, with variadic arguments) */
+#define TRJ_DEBUGF(level, msg, ...) \
+    do { \
+        if (POSTGIS_DEBUG_LEVEL >= level) \
+            trjinfo("[%s:%s:%d] " msg, __FILE__, __func__, __LINE__, __VA_ARGS__); \
+    } while (0);
+
+#else
+
+/* Empty prototype that can be optimised away by the compiler for non-debug builds */
+#define TRJ_DEBUG(level, msg) \
+    ((void) 0)
+
+/* Empty prototype that can be optimised away by the compiler for non-debug builds */
+#define TRJ_DEBUGF(level, msg, ...) \
+    ((void) 0)
+
+#endif
+
+/*- memory context -------------------------------------------------------*/
+
+void trj_set_handlers(trj_allocator allocator, trj_reallocator reallocator,
+        trj_deallocator deallocator, trj_message_handler error_handler,
+        trj_message_handler info_handler, trj_message_handler warning_handler);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+IMPLEMENT
+/*
+ * Default allocators
+ *
+ * We include some default allocators that use malloc/free/realloc
+ * along with stdout/stderr since this is the most common use case
+ *
+ */
+void *
+default_trj_allocator(size_t size)
+{
+    void *mem = malloc(size);
+    return mem;
+}
+
+void *
+default_trj_reallocator(void *mem, size_t size)
+{
+    void *ret = realloc(mem, size);
+    return ret;
+}
+
+void
+default_trj_deallocator(void *mem)
+{
+    free(mem);
+}
+
+void
+default_trj_error_handler(const char *fmt, va_list ap) {
+
+    static const char *label = "ERROR: ";
+    char newfmt[1024] = {0};
+    snprintf(newfmt, 1024, "%s%s\n", label, fmt);
+    newfmt[1023] = '\0';
+
+    vprintf(newfmt, ap);
+
+    va_end(ap);
+}
+
+void
+default_trj_warning_handler(const char *fmt, va_list ap) {
+
+    static const char *label = "WARNING: ";
+    char newfmt[1024] = {0};
+    snprintf(newfmt, 1024, "%s%s\n", label, fmt);
+    newfmt[1023] = '\0';
+
+    vprintf(newfmt, ap);
+
+    va_end(ap);
+}
+
+void
+default_trj_info_handler(const char *fmt, va_list ap) {
+
+    static const char *label = "INFO: ";
+    char newfmt[1024] = {0};
+    snprintf(newfmt, 1024, "%s%s\n", label, fmt);
+    newfmt[1023] = '\0';
+
+    vprintf(newfmt, ap);
+
+    va_end(ap);
+}
+
+/**
+ * Struct definition here
+ */
+struct trj_context_t {
+    trj_allocator alloc;
+    trj_reallocator realloc;
+    trj_deallocator dealloc;
+    trj_message_handler err;
+    trj_message_handler warn;
+    trj_message_handler info;
+};
+
+/* Static variable, to be used for all trj_core functions */
+static struct trj_context_t ctx_t = {
+    .alloc = init_trj_allocator,
+    .realloc = init_trj_reallocator,
+    .dealloc = init_trj_deallocator,
+    .err = init_trj_errorreporter,
+    .warn = init_trj_warnreporter,
+    .info = init_trj_inforeporter
+};
+
+
+/**
+ * This function is normally called by trj_init_allocators when no special memory
+ * management is needed. Useful in raster core testing and in the (future)
+ * loader, when we need to use trajectory core functions but we don't have
+ * PostgreSQL backend behind. We must take care of memory by ourselves in those
+ * situations
+ */
+void
+trj_install_default_allocators(void)
+{
+    ctx_t.alloc = default_trj_allocator;
+    ctx_t.realloc = default_trj_reallocator;
+    ctx_t.dealloc = default_trj_deallocator;
+    ctx_t.err = default_trj_error_handler;
+    ctx_t.info = default_trj_info_handler;
+    ctx_t.warn = default_trj_warning_handler;
+}
+
+
+/**
+ * This function is called by trj_init_allocators when the PostgreSQL backend is
+ * taking care of the memory and we want to use palloc family
+ */
+void
+trj_set_handlers(trj_allocator allocator, trj_reallocator reallocator,
+        trj_deallocator deallocator, trj_message_handler error_handler,
+        trj_message_handler info_handler, trj_message_handler warning_handler) {
+
+    ctx_t.alloc = allocator;
+    ctx_t.realloc = reallocator;
+    ctx_t.dealloc = deallocator;
+
+    ctx_t.err = error_handler;
+    ctx_t.info = info_handler;
+    ctx_t.warn = warning_handler;
+}
+
+
+
+/**
+ * Initialisation allocators
+ *
+ * These are used the first time any of the allocators are called to enable
+ * executables/libraries that link into raster to be able to set up their own
+ * allocators. This is mainly useful for older PostgreSQL versions that don't
+ * have functions that are called upon startup.
+ **/
+void *
+init_trj_allocator(size_t size)
+{
+    trj_init_allocators();
+
+    return ctx_t.alloc(size);
+}
+
+void
+init_trj_deallocator(void *mem)
+{
+    trj_init_allocators();
+
+    ctx_t.dealloc(mem);
+}
+
+
+void *
+init_trj_reallocator(void *mem, size_t size)
+{
+    trj_init_allocators();
+
+    return ctx_t.realloc(mem, size);
+}
+
+void
+init_trj_inforeporter(const char *fmt, va_list ap)
+{
+    trj_init_allocators();
+
+    (*ctx_t.info)(fmt, ap);
+}
+
+void
+init_trj_warnreporter(const char *fmt, va_list ap)
+{
+    trj_init_allocators();
+
+    (*ctx_t.warn)(fmt, ap);
+}
+
+
+void
+init_trj_errorreporter(const char *fmt, va_list ap)
+{
+    trj_init_allocators();
+
+    (*ctx_t.err)(fmt, ap);
+
+}
+
+
+/**
+ * Trajectory core error and info handlers
+ *
+ * Since variadic functions cannot pass their parameters directly, we need
+ * wrappers for these functions to convert the arguments into a va_list
+ * structure.
+ */
+void
+trjerror(const char *fmt, ...) {
+    va_list ap;
+
+    va_start(ap, fmt);
+
+    /* Call the supplied function */
+    (*ctx_t.err)(fmt, ap);
+
+    va_end(ap);
+}
+
+void
+trjinfo(const char *fmt, ...) {
+    va_list ap;
+
+    va_start(ap, fmt);
+
+    /* Call the supplied function */
+    (*ctx_t.info)(fmt, ap);
+
+    va_end(ap);
+}
+
+
+void
+trjwarn(const char *fmt, ...) {
+    va_list ap;
+
+    va_start(ap, fmt);
+
+    /* Call the supplied function */
+    (*ctx_t.warn)(fmt, ap);
+
+    va_end(ap);
+}
+
+
